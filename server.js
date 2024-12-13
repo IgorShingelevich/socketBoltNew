@@ -1,6 +1,8 @@
-import express from 'express';
-import WebSocket from 'ws';
-import { createServer } from 'http';
+const express = require('express');
+const WebSocket = require('ws');
+const { createServer } = require('http');
+const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const server = createServer(app);
@@ -11,6 +13,12 @@ const WS_PORT = 3001;
 const wss = new WebSocket.Server({ port: WS_PORT, path: '/progress' });
 
 app.use(express.json());
+app.use(express.static(__dirname));
+
+// Explicitly handle root route
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'test.html'));
+});
 
 let calculationState = null;
 let stateTimeout = null;
@@ -50,7 +58,6 @@ function clearCalculation() {
   }
 }
 
-// Broadcast state to all connected clients
 function broadcastState(state) {
   calculationState = state;
   wss.clients.forEach((client) => {
@@ -65,20 +72,24 @@ app.post('/startCalculation', (req, res) => {
     return res.status(400).json({ error: 'Calculation already running' });
   }
 
+  calculationState = states.STARTING;
   broadcastState(states.STARTING);
-  
-  // Simulate state changes with immediate WebSocket updates
+
+  // Simulate state transitions
   stateTimeout = setTimeout(() => {
     broadcastState(states.IN_PROGRESS);
+    
     stateTimeout = setTimeout(() => {
       broadcastState(states.ALMOST_DONE);
+      
       stateTimeout = setTimeout(() => {
         broadcastState(states.SUCCESS);
+        clearCalculation();
       }, 2000);
     }, 2000);
   }, 2000);
 
-  res.json({ status: 'started' });
+  res.json({ status: 'Calculation started' });
 });
 
 app.post('/stopCalculation', (req, res) => {
@@ -88,10 +99,11 @@ app.post('/stopCalculation', (req, res) => {
 
   clearCalculation();
   broadcastState(states.CANCELED);
-  res.json({ status: states.CANCELED });
+  res.json({ status: 'Calculation canceled' });
 });
 
+// Start HTTP server
 server.listen(HTTP_PORT, () => {
   console.log(`HTTP Server running on port ${HTTP_PORT}`);
-  console.log(`WebSocket Server running on ws://localhost:${WS_PORT}/progress`);
+  console.log(`WebSocket Server running on port ${WS_PORT}`);
 });
