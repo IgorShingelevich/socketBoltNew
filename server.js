@@ -26,6 +26,7 @@ app.get('/', (req, res) => {
 
 let calculationState = null;
 let stateTimeout = null;
+const connectedClients = new Set();
 
 const states = {
   STARTING: 'STARTING_CALCULATION',
@@ -39,6 +40,8 @@ const states = {
 // WebSocket connection handling
 wss.on('connection', (ws) => {
   console.log('Client connected to WebSocket');
+  connectedClients.add(ws);
+  console.log(`Total connected clients: ${connectedClients.size}`);
 
   // Send current state if exists
   if (calculationState) {
@@ -47,10 +50,14 @@ wss.on('connection', (ws) => {
 
   ws.on('close', () => {
     console.log('Client disconnected from WebSocket');
+    connectedClients.delete(ws);
+    console.log(`Total connected clients: ${connectedClients.size}`);
   });
 
   ws.on('error', (error) => {
     console.error('WebSocket error:', error);
+    connectedClients.delete(ws);
+    console.log(`Total connected clients: ${connectedClients.size}`);
   });
 });
 
@@ -64,7 +71,7 @@ function clearCalculation() {
 
 function broadcastState(state) {
   calculationState = state;
-  wss.clients.forEach((client) => {
+  connectedClients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
       client.send(JSON.stringify({ state }));
     }
