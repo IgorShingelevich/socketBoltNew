@@ -5,89 +5,92 @@ const cancelBtn = document.getElementById('cancelBtn');
 const spinner = document.getElementById('spinner');
 const status = document.getElementById('status');
 
+// WebSocket setup
 let ws = null;
 
 function connectWebSocket() {
-    ws = new WebSocket(`ws://localhost:${config.WS_PORT}${config.WS_PATH}`);
+    ws = new WebSocket(`ws://localhost:3002`);
     
     ws.onopen = () => {
-        console.log('Connected to WebSocket');
-        status.textContent = 'Connected to WebSocket';
+        console.log('WebSocket Connected');
     };
     
     ws.onmessage = (event) => {
-        console.log('Received message:', event.data);
+        console.log('WebSocket message received:', event.data);
         const data = JSON.parse(event.data);
         
+        // Update UI based on calculation state
         switch(data.type) {
-            case config.MESSAGE_TYPES.STATE_UPDATE:
-                updateStatus(data.data.state);
-                break;
-            case config.MESSAGE_TYPES.RESPONSE:
-                console.log('Server response:', data.data);
-                break;
-            case config.MESSAGE_TYPES.ERROR:
-                status.textContent = 'Error: ' + data.data.error;
-                spinner.style.display = 'none';
+            case 'STARTING_CALCULATION':
+            case 'IN_PROGRESS_CALCULATION':
+            case 'ALMOST_DONE_CALCULATION':
+            case 'CALCULATION_STOPPED':
+                status.textContent = data.data.state;
                 break;
             default:
-                console.warn('Unknown message type:', data);
+                console.warn('Unknown message type:', data.type);
         }
     };
     
     ws.onclose = () => {
-        console.log('Disconnected from WebSocket');
-        status.textContent = 'Disconnected from WebSocket';
-        spinner.style.display = 'none';
+        console.log('WebSocket Disconnected');
         // Try to reconnect after 3 seconds
-        setTimeout(connectWebSocket, config.WS_RECONNECT_TIMEOUT);
+        setTimeout(connectWebSocket, 3000);
     };
     
     ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
-        status.textContent = 'WebSocket error occurred';
-        spinner.style.display = 'none';
+        console.error('WebSocket Error:', error);
     };
 }
 
-function updateStatus(state) {
-    status.textContent = state;
+async function startCalculation() {
+    spinner.style.display = 'block';
+    status.textContent = 'Starting calculation...';
     
-    if (state === config.STATES.STARTING_CALCULATION || 
-        state === config.STATES.IN_PROGRESS_CALCULATION || 
-        state === config.STATES.ALMOST_DONE_CALCULATION) {
-        spinner.style.display = 'inline-block';
-    } else {
+    try {
+        const response = await fetch('/startCalculation', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                timestamp: new Date().toISOString()
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to start calculation');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        status.textContent = 'Error starting calculation';
         spinner.style.display = 'none';
     }
 }
 
-async function startCalculation() {
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-        status.textContent = 'WebSocket not connected';
-        return;
-    }
-
-    ws.send(JSON.stringify({
-        action: config.ACTIONS.START,
-        timestamp: new Date().toISOString()
-    }));
-}
-
 async function cancelCalculation() {
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-        status.textContent = 'WebSocket not connected';
-        return;
+    try {
+        const response = await fetch('/stopCalculation', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                timestamp: new Date().toISOString()
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to stop calculation');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        status.textContent = 'Error stopping calculation';
     }
-
-    ws.send(JSON.stringify({
-        action: config.ACTIONS.CANCEL,
-        timestamp: new Date().toISOString()
-    }));
 }
 
 startBtn.addEventListener('click', startCalculation);
 cancelBtn.addEventListener('click', cancelCalculation);
 
-// Connect to WebSocket when page loads
+// Connect WebSocket when page loads
 connectWebSocket();
