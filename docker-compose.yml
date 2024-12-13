@@ -1,0 +1,12 @@
+version: '3'
+services:
+  websocket-app:
+    build: .
+    ports:
+      - "3002:3002"
+      - "3003:3003"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=production
