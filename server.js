@@ -23,81 +23,85 @@ app.use((req, res, next) => {
 app.use(express.static(join(__dirname, 'public')));
 app.use(express.json());
 
-// Store connected WebSocket clients and calculation state
+// Store connected WebSocket clients
 const clients = new Set();
 let calculationTimer = null;
+let currentState = null;
+let stateTimers = [];
+
+function clearStateTimers() {
+    stateTimers.forEach(timer => clearTimeout(timer));
+    stateTimers = [];
+}
+
+function broadcastMessage(type, state) {
+    console.log(`Broadcasting message - type: ${type}, state: ${state}`);
+    currentState = state;
+    const message = JSON.stringify({
+        type: type,
+        data: { state: state }
+    });
+    
+    wss.clients.forEach(client => {
+        if (client.readyState === 1) { // WebSocket.OPEN
+            console.log('Sending to client:', message);
+            client.send(message);
+        }
+    });
+}
 
 function startCalculation() {
     if (calculationTimer) {
-        return false; // Calculation already running
+        console.log('Calculation already running');
+        return false;
     }
 
-    // Send STARTING_CALCULATION immediately
-    wss.clients.forEach(client => {
-        if (client.readyState === 1) { // WebSocket.OPEN
-            client.send(JSON.stringify({
-                type: 'STARTING_CALCULATION',
-                data: { state: 'Starting calculation...' }
-            }));
-        }
-    });
-
-    // Schedule IN_PROGRESS after 2 seconds
-    setTimeout(() => {
-        wss.clients.forEach(client => {
-            if (client.readyState === 1) {
-                client.send(JSON.stringify({
-                    type: 'IN_PROGRESS_CALCULATION',
-                    data: { state: 'Calculation in progress...' }
-                }));
-            }
-        });
+    console.log('Starting calculation sequence');
+    clearStateTimers();
+    
+    // Immediate: STARTING_CALCULATION
+    broadcastMessage('STARTING_CALCULATION', 'Starting calculation...');
+    
+    // After 2s: IN_PROGRESS_CALCULATION
+    const timer1 = setTimeout(() => {
+        console.log('Sending in-progress message');
+        broadcastMessage('IN_PROGRESS_CALCULATION', 'Calculation in progress...');
     }, 2000);
+    stateTimers.push(timer1);
 
-    // Schedule ALMOST_DONE after 4 seconds
-    setTimeout(() => {
-        wss.clients.forEach(client => {
-            if (client.readyState === 1) {
-                client.send(JSON.stringify({
-                    type: 'ALMOST_DONE_CALCULATION',
-                    data: { state: 'Almost done...' }
-                }));
-            }
-        });
+    // After 4s: ALMOST_DONE_CALCULATION
+    const timer2 = setTimeout(() => {
+        console.log('Sending almost-done message');
+        broadcastMessage('ALMOST_DONE_CALCULATION', 'Almost done...');
     }, 4000);
+    stateTimers.push(timer2);
 
-    // Schedule SUCCESS after 6 seconds
+    // After 6s: SUCCESS
     calculationTimer = setTimeout(() => {
-        wss.clients.forEach(client => {
-            if (client.readyState === 1) {
-                client.send(JSON.stringify({
-                    type: 'CALCULATION_COMPLETE',
-                    data: { state: 'SUCCESS' }
-                }));
-            }
-        });
+        console.log('Sending completion message');
+        broadcastMessage('CALCULATION_COMPLETE', 'SUCCESS');
+        clearStateTimers();
         calculationTimer = null;
+        currentState = null;
     }, 6000);
+    stateTimers.push(calculationTimer);
 
     return true;
 }
 
 function stopCalculation() {
-    if (calculationTimer) {
-        clearTimeout(calculationTimer);
-        calculationTimer = null;
-
-        wss.clients.forEach(client => {
-            if (client.readyState === 1) {
-                client.send(JSON.stringify({
-                    type: 'CALCULATION_STOPPED',
-                    data: { state: 'CANCELED' }
-                }));
-            }
-        });
-        return true;
+    if (!calculationTimer) {
+        console.log('No calculation running to stop');
+        return false;
     }
-    return false;
+    
+    console.log('Stopping calculation');
+    clearTimeout(calculationTimer);
+    clearStateTimers();
+    calculationTimer = null;
+    broadcastMessage('CALCULATION_STOPPED', 'CANCELED');
+    currentState = null;
+    return true;
 }
 
 // HTTP endpoints just trigger the WebSocket messages
@@ -119,11 +123,17 @@ wss.on('connection', (ws, request) => {
     clients.add(ws);
     
     // Send welcome message
-    ws.send(JSON.stringify({
+    const welcomeMessage = JSON.stringify({
         type: 'CONNECTED',
         data: { state: 'WebSocket connection established' }
-    }));
+    });
+    console.log('Sending welcome message:', welcomeMessage);
+    ws.send(welcomeMessage);
     
+    ws.on('message', (message) => {
+        console.log('Received WebSocket message:', message.toString());
+    });
+
     ws.on('close', () => {
         console.log('WebSocket connection closed');
         clients.delete(ws);

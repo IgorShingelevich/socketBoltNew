@@ -28,7 +28,11 @@ function connectWebSocket() {
         ws.onopen = () => {
             console.log('WebSocket Connected');
             status.textContent = 'Connected to WebSocket';
-            reconnectAttempts = 0; // Reset attempts on successful connection
+            reconnectAttempts = 0;
+            
+            // Send a test ping
+            console.log('Sending test ping');
+            ws.send('ping');
         };
         
         ws.onmessage = (event) => {
@@ -92,17 +96,21 @@ function handleWebSocketMessage(data) {
 
 async function startCalculation() {
     if (!ws || ws.readyState !== WebSocket.OPEN) {
+        console.log('WebSocket not connected, attempting to reconnect...');
         status.textContent = 'WebSocket not connected';
+        connectWebSocket();
         return;
     }
 
     try {
+        console.log('Sending start calculation request...');
         const response = await fetch('/startCalculation', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
         });
         
         if (!response.ok) throw new Error('Failed to start calculation');
+        console.log('Start calculation request sent successfully');
     } catch (error) {
         console.error('Error:', error);
         status.textContent = 'Error starting calculation';
@@ -112,17 +120,21 @@ async function startCalculation() {
 
 async function cancelCalculation() {
     if (!ws || ws.readyState !== WebSocket.OPEN) {
+        console.log('WebSocket not connected, attempting to reconnect...');
         status.textContent = 'WebSocket not connected';
+        connectWebSocket();
         return;
     }
 
     try {
+        console.log('Sending stop calculation request...');
         const response = await fetch('/stopCalculation', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
         });
         
         if (!response.ok) throw new Error('Failed to stop calculation');
+        console.log('Stop calculation request sent successfully');
     } catch (error) {
         console.error('Error:', error);
         status.textContent = 'Error stopping calculation';
