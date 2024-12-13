@@ -1,0 +1,34 @@
+I want to create a training web application to master WebSocket messages. The app should have the following features and behavior:
+
+General Description:
+The app simulates a calculation process using WebSockets for real-time communication. It consists of two buttons:
+
+"Start Calculation": Starts a dummy calculation process and polls WebSocket messages to show the progress.
+"Cancel Calculation": Cancels the ongoing calculation process, and a notification will display the state as CANCELED.
+The server backend will handle WebSocket messages and mimic the calculation process with predefined dummy states:
+
+STARTING_CALCULATION (2 seconds)
+IN_PROGRESS_CALCULATION (2 seconds)
+ALMOST_DONE_CALCULATION (2 seconds)
+Final state: SUCCESS, FAIL, or CANCELED
+Requirements:
+Frontend (UI):
+Design: Use the simplest possible design with two buttons, a spinner (loader), and a notification area near the buttons.
+Behavior:
+Clicking "Start Calculation" sends a POST request to /startCalculation and starts polling WebSocket messages from /progress every 0.5 seconds.
+During polling, display the spinner. The spinner disappears when the process reaches the final state (SUCCESS/FAIL/CANCELED).
+Clicking "Cancel Calculation" sends a POST request to /stopCalculation, halts polling, and displays CANCELED near the button.
+Backend:
+The backend will manage WebSocket events and simulate a calculation process. It includes the following APIs:
+
+POST /startCalculation: Starts a dummy process for 6 seconds (progressing through STARTING_CALCULATION, IN_PROGRESS_CALCULATION, ALMOST_DONE_CALCULATION).
+POST /progress: Simulates WebSocket polling responses with predefined intervals for each state.
+POST /stopCalculation: Cancels the calculation and returns CANCELED. If no calculation is running, respond with "No calculation running."
+State Timings:
+
+STARTING_CALCULATION: 2 seconds
+IN_PROGRESS_CALCULATION: 2 seconds
+ALMOST_DONE_CALCULATION: 2 seconds
+Final states:
+If uninterrupted: Respond SUCCESS.
+If canceled: Respond CANCELED.

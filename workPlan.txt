@@ -1,0 +1,99 @@
+# WebSocket Training App Implementation Plan
+
+## 1. Server WebSocket Setup
+- Implement WebSocket server initialization and connection handling
+- Add WebSocket client tracking (connected clients array)
+- Success Criteria:
+  - Server logs show successful WebSocket initialization
+  - Can connect to WebSocket endpoint using a test client
+  - Server detects client connections/disconnections
+- Status: Completed server implementation, pending testing
+
+## 2. Server State Management Refactor
+- Move state management from HTTP endpoints to WebSocket handlers
+- Implement state transition logic with timeouts
+- Success Criteria:
+  - State transitions work with correct timing (2s each)
+  - State is properly maintained between transitions
+  - Previous HTTP state management removed
+- Status: Not Started
+
+## 3. WebSocket Message Protocol
+- Define WebSocket message types and formats
+- Implement message serialization/deserialization
+- Success Criteria:
+  - All message types documented
+  - Test messages can be properly serialized/deserialized
+  - Message format matches requirements for all states
+- Status: Not Started
+
+## 4. Server Calculation Control
+- Implement start calculation WebSocket handler
+- Add calculation state broadcast to all clients
+- Success Criteria:
+  - Calculation starts via WebSocket message
+  - All connected clients receive state updates
+  - State progression works (STARTING → IN_PROGRESS → ALMOST_DONE)
+- Status: Not Started
+
+## 5. Server Cancel Implementation
+- Add cancel calculation WebSocket handler
+- Implement proper cleanup of running calculations
+- Success Criteria:
+  - Can cancel running calculation
+  - All timeouts properly cleared
+  - CANCELED state broadcast to all clients
+- Status: Not Started
+
+## 6. Frontend WebSocket Connection
+- Remove HTTP polling code
+- Add WebSocket connection setup
+- Implement reconnection logic
+- Success Criteria:
+  - WebSocket connection established on app start
+  - Connection status properly managed
+  - Automatic reconnection works
+- Status: Not Started
+
+## 7. Frontend Message Handlers
+- Implement WebSocket message listeners
+- Add state update handlers
+- Success Criteria:
+  - All server messages properly received
+  - State updates reflect in UI
+  - No console errors
+- Status: Not Started
+
+## 8. Frontend UI Updates
+- Update start/cancel button handlers to use WebSocket
+- Implement proper loading states
+- Success Criteria:
+  - Buttons trigger correct WebSocket messages
+  - Loading spinner works correctly
+  - UI updates match state changes
+- Status: Not Started
+
+## 9. Error Handling
+- Add proper error handling for WebSocket operations
+- Implement user feedback for errors
+- Success Criteria:
+  - Connection errors properly handled
+  - User notified of connection issues
+  - App gracefully handles server disconnects
+- Status: Not Started
+
+## 10. Final Integration Testing
+- Test complete calculation flow
+- Verify all requirements met
+- Success Criteria:
+  - Full calculation cycle works (start to success)
+  - Cancel works at any stage
+  - All timings match requirements
+  - UI elements behave as specified
+  - Multiple clients work simultaneously
+- Status: Not Started
+
+## Notes
+- Each task must be completed and verified before moving to the next
+- Status will be updated as we progress
+- Issues found during implementation will be documented here
