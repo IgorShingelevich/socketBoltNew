@@ -1,23 +1,27 @@
-const express = require('express');
-const WebSocket = require('ws');
-const { createServer } = require('http');
-const path = require('path');
-const fs = require('fs');
+import express from 'express';
+import { WebSocketServer } from 'ws';
+import { createServer } from 'http';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import fs from 'fs';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const app = express();
 const server = createServer(app);
-const HTTP_PORT = 3000;
-const WS_PORT = 3001;
+const HTTP_PORT = 3002;
+const WS_PORT = 3003;
 
 // Initialize WebSocket Server on separate port
-const wss = new WebSocket.Server({ port: WS_PORT, path: '/progress' });
+const wss = new WebSocketServer({ port: WS_PORT, path: '/progress' });
 
 app.use(express.json());
 app.use(express.static(__dirname));
 
 // Explicitly handle root route
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'test.html'));
+    res.sendFile(join(__dirname, 'test.html'));
 });
 
 let calculationState = null;

@@ -1,6 +1,6 @@
-const express = require('express');
+import express from 'express';
 const app = express();
-const port = 3000;
+const port = 3002;
 
 app.get('/', (req, res) => {
     res.send(`
@@ -16,6 +16,8 @@ app.get('/', (req, res) => {
     `);
 });
 
-app.listen(port, () => {
+const server = app.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`);
+}).on('error', (err) => {
+    console.error('Failed to start server:', err);
 });
