@@ -6,7 +6,7 @@ const status = document.getElementById('status');
 let ws = null;
 
 function connectWebSocket() {
-    ws = new WebSocket('ws://localhost:3001/progress');
+    ws = new WebSocket('ws://localhost:3003/progress');
     
     ws.onopen = () => {
         console.log('Connected to WebSocket');

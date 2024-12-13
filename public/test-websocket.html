@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+</head>
+<body>
+    <h1>WebSocket Test Page</h1>
+    <button onclick="startCalc()">Start Calculation</button>
+    <button onclick="cancelCalc()">Cancel Calculation</button>
+    <div id="status">Status: Not started</div>
+
+    <script>
+        const ws = new WebSocket('ws://localhost:3003/progress');
+        const statusDiv = document.getElementById('status');
+
+        ws.onopen = () => {
+            statusDiv.textContent = 'Status: Connected to WebSocket';
+        };
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            statusDiv.textContent = 'Status: ' + (data.state || data.status || JSON.stringify(data));
+        };
+
+        ws.onerror = (error) => {
+            statusDiv.textContent = 'Error: ' + error;
+        };
+
+        function startCalc() {
+            ws.send(JSON.stringify({ action: 'start' }));
+        }
+
+        function cancelCalc() {
+            ws.send(JSON.stringify({ action: 'cancel' }));
+        }
+    </script>
+</body>
+</html>

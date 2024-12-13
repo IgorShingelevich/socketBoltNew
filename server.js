@@ -17,11 +17,11 @@ const WS_PORT = 3003;
 const wss = new WebSocketServer({ port: WS_PORT, path: '/progress' });
 
 app.use(express.json());
-app.use(express.static(__dirname));
+app.use(express.static(join(__dirname, 'public')));
 
 // Explicitly handle root route
 app.get('/', (req, res) => {
-    res.sendFile(join(__dirname, 'test.html'));
+    res.sendFile(join(__dirname, 'public', 'index.html'));
 });
 
 let calculationState = null;
@@ -37,6 +37,52 @@ const states = {
   CANCELED: 'CANCELED'
 };
 
+function clearCalculation() {
+  calculationState = null;
+  if (stateTimeout) {
+    clearTimeout(stateTimeout);
+    stateTimeout = null;
+  }
+}
+
+function startCalculationProcess() {
+  if (calculationState) {
+    return false;
+  }
+
+  // Start the calculation process
+  calculationState = states.STARTING;
+  broadcastState(states.STARTING);
+
+  // State transition: STARTING -> IN_PROGRESS (after 2s)
+  stateTimeout = setTimeout(() => {
+    broadcastState(states.IN_PROGRESS);
+    
+    // State transition: IN_PROGRESS -> ALMOST_DONE (after 2s)
+    stateTimeout = setTimeout(() => {
+      broadcastState(states.ALMOST_DONE);
+      
+      // State transition: ALMOST_DONE -> SUCCESS (after 2s)
+      stateTimeout = setTimeout(() => {
+        broadcastState(states.SUCCESS);
+        clearCalculation();
+      }, 2000);
+    }, 2000);
+  }, 2000);
+
+  return true;
+}
+
+function cancelCalculationProcess() {
+  if (!calculationState) {
+    return false;
+  }
+
+  clearCalculation();
+  broadcastState(states.CANCELED);
+  return true;
+}
+
 // WebSocket connection handling
 wss.on('connection', (ws) => {
   console.log('Client connected to WebSocket');
@@ -47,6 +93,37 @@ wss.on('connection', (ws) => {
   if (calculationState) {
     ws.send(JSON.stringify({ state: calculationState }));
   }
+
+  // Handle incoming messages
+  ws.on('message', (message) => {
+    try {
+      const data = JSON.parse(message);
+      
+      switch(data.action) {
+        case 'start':
+          if (startCalculationProcess()) {
+            ws.send(JSON.stringify({ status: 'started' }));
+          } else {
+            ws.send(JSON.stringify({ error: 'Calculation already running' }));
+          }
+          break;
+          
+        case 'cancel':
+          if (cancelCalculationProcess()) {
+            ws.send(JSON.stringify({ status: 'canceled' }));
+          } else {
+            ws.send(JSON.stringify({ error: 'No calculation running' }));
+          }
+          break;
+          
+        default:
+          ws.send(JSON.stringify({ error: 'Unknown action' }));
+      }
+    } catch (error) {
+      console.error('Error processing message:', error);
+      ws.send(JSON.stringify({ error: 'Invalid message format' }));
+    }
+  });
 
   ws.on('close', () => {
     console.log('Client disconnected from WebSocket');
@@ -61,16 +138,9 @@ wss.on('connection', (ws) => {
   });
 });
 
-function clearCalculation() {
-  calculationState = null;
-  if (stateTimeout) {
-    clearTimeout(stateTimeout);
-    stateTimeout = null;
-  }
-}
-
 function broadcastState(state) {
   calculationState = state;
+  console.log(`Broadcasting state: ${state}`);
   connectedClients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
       client.send(JSON.stringify({ state }));
@@ -78,39 +148,21 @@ function broadcastState(state) {
   });
 }
 
+// HTTP endpoints (now just proxying to WebSocket handlers)
 app.post('/startCalculation', (req, res) => {
-  if (calculationState) {
-    return res.status(400).json({ error: 'Calculation already running' });
+  if (startCalculationProcess()) {
+    res.json({ status: 'Calculation started' });
+  } else {
+    res.status(400).json({ error: 'Calculation already running' });
   }
-
-  calculationState = states.STARTING;
-  broadcastState(states.STARTING);
-
-  // Simulate state transitions
-  stateTimeout = setTimeout(() => {
-    broadcastState(states.IN_PROGRESS);
-    
-    stateTimeout = setTimeout(() => {
-      broadcastState(states.ALMOST_DONE);
-      
-      stateTimeout = setTimeout(() => {
-        broadcastState(states.SUCCESS);
-        clearCalculation();
-      }, 2000);
-    }, 2000);
-  }, 2000);
-
-  res.json({ status: 'Calculation started' });
 });
 
 app.post('/stopCalculation', (req, res) => {
-  if (!calculationState) {
-    return res.status(400).json({ error: 'No calculation running' });
+  if (cancelCalculationProcess()) {
+    res.json({ status: 'Calculation canceled' });
+  } else {
+    res.status(400).json({ error: 'No calculation running' });
   }
-
-  clearCalculation();
-  broadcastState(states.CANCELED);
-  res.json({ status: 'Calculation canceled' });
 });
 
 // Start HTTP server
