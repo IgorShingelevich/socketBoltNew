@@ -9,12 +9,9 @@ const __dirname = dirname(__filename);
 
 const app = express();
 const server = createServer(app);
-
-// More detailed WebSocket server setup
 const wss = new WebSocketServer({ 
     server,
-    path: '/ws',
-    clientTracking: true
+    path: '/ws'
 });
 
 // Add request logging middleware
@@ -26,71 +23,109 @@ app.use((req, res, next) => {
 app.use(express.static(join(__dirname, 'public')));
 app.use(express.json());
 
-// Store connected WebSocket clients
+// Store connected WebSocket clients and calculation state
 const clients = new Set();
+let calculationTimer = null;
 
-// HTTP endpoints
-app.post('/startCalculation', (req, res) => {
-    console.log('Calculation started via HTTP');
-    res.json({ status: 'ok' });
-    
-    // Broadcast calculation status via WebSocket
-    broadcastToAll({
-        type: 'STARTING_CALCULATION',
-        data: { state: 'Starting calculation...' }
+function startCalculation() {
+    if (calculationTimer) {
+        return false; // Calculation already running
+    }
+
+    // Send STARTING_CALCULATION immediately
+    wss.clients.forEach(client => {
+        if (client.readyState === 1) { // WebSocket.OPEN
+            client.send(JSON.stringify({
+                type: 'STARTING_CALCULATION',
+                data: { state: 'Starting calculation...' }
+            }));
+        }
     });
 
-    // Simulate calculation progress
+    // Schedule IN_PROGRESS after 2 seconds
     setTimeout(() => {
-        broadcastToAll({
-            type: 'IN_PROGRESS_CALCULATION',
-            data: { state: 'Calculation in progress...' }
+        wss.clients.forEach(client => {
+            if (client.readyState === 1) {
+                client.send(JSON.stringify({
+                    type: 'IN_PROGRESS_CALCULATION',
+                    data: { state: 'Calculation in progress...' }
+                }));
+            }
         });
     }, 2000);
 
+    // Schedule ALMOST_DONE after 4 seconds
     setTimeout(() => {
-        broadcastToAll({
-            type: 'ALMOST_DONE_CALCULATION',
-            data: { state: 'Almost done...' }
+        wss.clients.forEach(client => {
+            if (client.readyState === 1) {
+                client.send(JSON.stringify({
+                    type: 'ALMOST_DONE_CALCULATION',
+                    data: { state: 'Almost done...' }
+                }));
+            }
         });
     }, 4000);
 
-    // Add completion message
-    setTimeout(() => {
-        broadcastToAll({
-            type: 'CALCULATION_COMPLETE',
-            data: { state: 'Calculation complete!' }
+    // Schedule SUCCESS after 6 seconds
+    calculationTimer = setTimeout(() => {
+        wss.clients.forEach(client => {
+            if (client.readyState === 1) {
+                client.send(JSON.stringify({
+                    type: 'CALCULATION_COMPLETE',
+                    data: { state: 'SUCCESS' }
+                }));
+            }
         });
+        calculationTimer = null;
     }, 6000);
+
+    return true;
+}
+
+function stopCalculation() {
+    if (calculationTimer) {
+        clearTimeout(calculationTimer);
+        calculationTimer = null;
+
+        wss.clients.forEach(client => {
+            if (client.readyState === 1) {
+                client.send(JSON.stringify({
+                    type: 'CALCULATION_STOPPED',
+                    data: { state: 'CANCELED' }
+                }));
+            }
+        });
+        return true;
+    }
+    return false;
+}
+
+// HTTP endpoints just trigger the WebSocket messages
+app.post('/startCalculation', (req, res) => {
+    console.log('Start calculation requested');
+    const started = startCalculation();
+    res.json({ status: started ? 'ok' : 'calculation_already_running' });
 });
 
 app.post('/stopCalculation', (req, res) => {
-    console.log('Calculation stopped via HTTP');
-    res.json({ status: 'ok' });
-    
-    broadcastToAll({
-        type: 'CALCULATION_STOPPED',
-        data: { state: 'Calculation stopped' }
-    });
+    console.log('Stop calculation requested');
+    const stopped = stopCalculation();
+    res.json({ status: stopped ? 'ok' : 'no_calculation_running' });
 });
 
-// WebSocket connection handling with detailed logging
+// WebSocket connection handling
 wss.on('connection', (ws, request) => {
     console.log(`New WebSocket connection from ${request.socket.remoteAddress}`);
-    console.log('Connection URL:', request.url);
-    console.log('Current number of clients:', wss.clients.size);
-    
     clients.add(ws);
     
-    // Send immediate welcome message
+    // Send welcome message
     ws.send(JSON.stringify({
         type: 'CONNECTED',
         data: { state: 'WebSocket connection established' }
     }));
     
-    ws.on('close', (code, reason) => {
-        console.log('WebSocket connection closed:', { code, reason });
-        console.log('Remaining clients:', wss.clients.size);
+    ws.on('close', () => {
+        console.log('WebSocket connection closed');
         clients.delete(ws);
     });
     
@@ -99,21 +134,6 @@ wss.on('connection', (ws, request) => {
         clients.delete(ws);
     });
 });
-
-function broadcastToAll(message) {
-    console.log('Broadcasting message:', message);
-    const messageStr = JSON.stringify(message);
-    let successCount = 0;
-    
-    clients.forEach((client) => {
-        if (client.readyState === 1) { // WebSocket.OPEN
-            client.send(messageStr);
-            successCount++;
-        }
-    });
-    
-    console.log(`Message broadcast to ${successCount} clients`);
-}
 
 const PORT = 3002;
 server.listen(PORT, () => {
