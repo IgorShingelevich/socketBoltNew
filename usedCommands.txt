@@ -1,2 +1,3 @@
 taskkill /F /IM node.exe
 node server.js
+node d:/repos/llmWorks/socketBoltNew/server.js
