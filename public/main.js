@@ -10,21 +10,41 @@ function connectWebSocket() {
     
     ws.onopen = () => {
         console.log('Connected to WebSocket');
+        status.textContent = 'Connected to WebSocket';
     };
     
     ws.onmessage = (event) => {
+        console.log('Received message:', event.data);
         const data = JSON.parse(event.data);
-        updateStatus(data.state);
+        
+        switch(data.type) {
+            case 'state_update':
+                updateStatus(data.data.state);
+                break;
+            case 'response':
+                console.log('Server response:', data.data);
+                break;
+            case 'error':
+                status.textContent = 'Error: ' + data.data.error;
+                spinner.style.display = 'none';
+                break;
+            default:
+                console.warn('Unknown message type:', data);
+        }
     };
     
     ws.onclose = () => {
         console.log('Disconnected from WebSocket');
+        status.textContent = 'Disconnected from WebSocket';
+        spinner.style.display = 'none';
         // Try to reconnect after 3 seconds
         setTimeout(connectWebSocket, 3000);
     };
     
     ws.onerror = (error) => {
         console.error('WebSocket error:', error);
+        status.textContent = 'WebSocket error occurred';
+        spinner.style.display = 'none';
     };
 }
 
@@ -41,41 +61,27 @@ function updateStatus(state) {
 }
 
 async function startCalculation() {
-    try {
-        const response = await fetch('/startCalculation', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        if (!response.ok) {
-            const error = await response.json();
-            status.textContent = error.error;
-        }
-    } catch (error) {
-        console.error('Error starting calculation:', error);
-        status.textContent = 'Error starting calculation';
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        status.textContent = 'WebSocket not connected';
+        return;
     }
+
+    ws.send(JSON.stringify({
+        action: 'start',
+        timestamp: new Date().toISOString()
+    }));
 }
 
 async function cancelCalculation() {
-    try {
-        const response = await fetch('/stopCalculation', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        if (!response.ok) {
-            const error = await response.json();
-            status.textContent = error.error;
-        }
-    } catch (error) {
-        console.error('Error canceling calculation:', error);
-        status.textContent = 'Error canceling calculation';
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        status.textContent = 'WebSocket not connected';
+        return;
     }
+
+    ws.send(JSON.stringify({
+        action: 'cancel',
+        timestamp: new Date().toISOString()
+    }));
 }
 
 startBtn.addEventListener('click', startCalculation);

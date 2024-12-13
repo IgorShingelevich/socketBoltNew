@@ -83,6 +83,23 @@ function cancelCalculationProcess() {
   return true;
 }
 
+function broadcastState(state) {
+  calculationState = state;
+  console.log(`Broadcasting state: ${state}`);
+  const message = JSON.stringify({
+    type: 'state_update',
+    data: {
+      state: state,
+      timestamp: new Date().toISOString()
+    }
+  });
+  connectedClients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(message);
+    }
+  });
+}
+
 // WebSocket connection handling
 wss.on('connection', (ws) => {
   console.log('Client connected to WebSocket');
@@ -91,37 +108,80 @@ wss.on('connection', (ws) => {
 
   // Send current state if exists
   if (calculationState) {
-    ws.send(JSON.stringify({ state: calculationState }));
+    ws.send(JSON.stringify({
+      type: 'state_update',
+      data: {
+        state: calculationState,
+        timestamp: new Date().toISOString()
+      }
+    }));
   }
 
   // Handle incoming messages
   ws.on('message', (message) => {
     try {
       const data = JSON.parse(message);
+      console.log('Received WebSocket message:', data);
       
       switch(data.action) {
         case 'start':
           if (startCalculationProcess()) {
-            ws.send(JSON.stringify({ status: 'started' }));
+            ws.send(JSON.stringify({
+              type: 'response',
+              data: {
+                status: 'started',
+                timestamp: new Date().toISOString()
+              }
+            }));
           } else {
-            ws.send(JSON.stringify({ error: 'Calculation already running' }));
+            ws.send(JSON.stringify({
+              type: 'error',
+              data: {
+                error: 'Calculation already running',
+                timestamp: new Date().toISOString()
+              }
+            }));
           }
           break;
           
         case 'cancel':
           if (cancelCalculationProcess()) {
-            ws.send(JSON.stringify({ status: 'canceled' }));
+            ws.send(JSON.stringify({
+              type: 'response',
+              data: {
+                status: 'canceled',
+                timestamp: new Date().toISOString()
+              }
+            }));
           } else {
-            ws.send(JSON.stringify({ error: 'No calculation running' }));
+            ws.send(JSON.stringify({
+              type: 'error',
+              data: {
+                error: 'No calculation running',
+                timestamp: new Date().toISOString()
+              }
+            }));
           }
           break;
           
         default:
-          ws.send(JSON.stringify({ error: 'Unknown action' }));
+          ws.send(JSON.stringify({
+            type: 'error',
+            data: {
+              error: 'Unknown action',
+              timestamp: new Date().toISOString()
+            }
+          }));
       }
     } catch (error) {
       console.error('Error processing message:', error);
-      ws.send(JSON.stringify({ error: 'Invalid message format' }));
+      ws.send(JSON.stringify({
+        type: 'error',
+        data: {
+          error: 'Invalid message format',
+          timestamp: new Date().toISOString()
+        }
+      }));
     }
   });
 
@@ -137,16 +197,6 @@ wss.on('connection', (ws) => {
     console.log(`Total connected clients: ${connectedClients.size}`);
   });
 });
-
-function broadcastState(state) {
-  calculationState = state;
-  console.log(`Broadcasting state: ${state}`);
-  connectedClients.forEach((client) => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(JSON.stringify({ state }));
-    }
-  });
-}
 
 // HTTP endpoints (now just proxying to WebSocket handlers)
 app.post('/startCalculation', (req, res) => {
