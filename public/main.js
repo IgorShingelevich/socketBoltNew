@@ -1,3 +1,5 @@
+import { config } from '../config.js';
+
 const startBtn = document.getElementById('startBtn');
 const cancelBtn = document.getElementById('cancelBtn');
 const spinner = document.getElementById('spinner');
@@ -6,7 +8,7 @@ const status = document.getElementById('status');
 let ws = null;
 
 function connectWebSocket() {
-    ws = new WebSocket('ws://localhost:3003/progress');
+    ws = new WebSocket(`ws://localhost:${config.WS_PORT}${config.WS_PATH}`);
     
     ws.onopen = () => {
         console.log('Connected to WebSocket');
@@ -18,13 +20,13 @@ function connectWebSocket() {
         const data = JSON.parse(event.data);
         
         switch(data.type) {
-            case 'state_update':
+            case config.MESSAGE_TYPES.STATE_UPDATE:
                 updateStatus(data.data.state);
                 break;
-            case 'response':
+            case config.MESSAGE_TYPES.RESPONSE:
                 console.log('Server response:', data.data);
                 break;
-            case 'error':
+            case config.MESSAGE_TYPES.ERROR:
                 status.textContent = 'Error: ' + data.data.error;
                 spinner.style.display = 'none';
                 break;
@@ -38,7 +40,7 @@ function connectWebSocket() {
         status.textContent = 'Disconnected from WebSocket';
         spinner.style.display = 'none';
         // Try to reconnect after 3 seconds
-        setTimeout(connectWebSocket, 3000);
+        setTimeout(connectWebSocket, config.WS_RECONNECT_TIMEOUT);
     };
     
     ws.onerror = (error) => {
@@ -51,9 +53,9 @@ function connectWebSocket() {
 function updateStatus(state) {
     status.textContent = state;
     
-    if (state === 'STARTING_CALCULATION' || 
-        state === 'IN_PROGRESS_CALCULATION' || 
-        state === 'ALMOST_DONE_CALCULATION') {
+    if (state === config.STATES.STARTING_CALCULATION || 
+        state === config.STATES.IN_PROGRESS_CALCULATION || 
+        state === config.STATES.ALMOST_DONE_CALCULATION) {
         spinner.style.display = 'inline-block';
     } else {
         spinner.style.display = 'none';
@@ -67,7 +69,7 @@ async function startCalculation() {
     }
 
     ws.send(JSON.stringify({
-        action: 'start',
+        action: config.ACTIONS.START,
         timestamp: new Date().toISOString()
     }));
 }
@@ -79,7 +81,7 @@ async function cancelCalculation() {
     }
 
     ws.send(JSON.stringify({
-        action: 'cancel',
+        action: config.ACTIONS.CANCEL,
         timestamp: new Date().toISOString()
     }));
 }
